@@ -1,0 +1,67 @@
+%% Mapa de Dependências SIFAP Legado — gerado por /map-dependencies em 2026-06-10
+%% Escopo: 01-arqueologia/legado-sifap/natural-programs/ (15 .NSN) + 4 DDMs
+%% NOTA: NÃO existem arestas programa→programa (nenhum CALLNAT/INCLUDE no legado).
+%% Todo acoplamento é programa→dados (Adabas FNR 150-153, DBID 57).
+flowchart LR
+  classDef prog fill:#0f172a,stroke:#334155,color:#e2e8f0
+  classDef data fill:#3b1d0f,stroke:#7c4a2d,color:#ffe8d6
+
+  subgraph Cadastro_Online["Cadastro / Online"]
+    CADBENEF["CADBENEF.NSN<br/>cadastro beneficiário"]:::prog
+    CADDEPEND["CADDEPEND.NSN<br/>cadastro dependentes"]:::prog
+    CADPROG["CADPROG.NSN<br/>cadastro programa"]:::prog
+    CONSBENF["CONSBENF.NSN<br/>consulta (MAP 3270)"]:::prog
+  end
+  subgraph Validacao["Validação (sem acesso a DB)"]
+    VALBENEF["VALBENEF.NSN<br/>valida cadastro (ÓRFÃO)"]:::prog
+    VALDOCS["VALDOCS.NSN<br/>valida documentos (ÓRFÃO)"]:::prog
+    VALELEG["VALELEG.NSN<br/>valida elegibilidade"]:::prog
+  end
+  subgraph Calculo["Cálculo"]
+    CALCBENF["CALCBENF.NSN<br/>calcula benefício"]:::prog
+    CALCDSCT["CALCDSCT.NSN<br/>calcula descontos"]:::prog
+    CALCCORR["CALCCORR.NSN<br/>correção IPCA"]:::prog
+  end
+  subgraph Batch["Batch"]
+    BATCHPGT["BATCHPGT.NSN<br/>folha mensal"]:::prog
+    BATCHCON["BATCHCON.NSN<br/>conciliação CNAB"]:::prog
+    BATCHREL["BATCHREL.NSN<br/>relatório consolidado"]:::prog
+  end
+  subgraph Relatorios["Relatórios"]
+    RELPGT["RELPGT.NSN<br/>relatório pagamentos"]:::prog
+    RELAUDIT["RELAUDIT.NSN<br/>trilha auditoria"]:::prog
+  end
+  subgraph Adabas["Adabas (DBID 57)"]
+    BEN[("BENEFICIARIO<br/>FNR 150")]:::data
+    PRG[("PROGRAMA-SOCIAL<br/>FNR 151")]:::data
+    PAG[("PAGAMENTO<br/>FNR 152")]:::data
+    AUD[("AUDITORIA<br/>FNR 153")]:::data
+  end
+  EXT["Arquivo CNAB 240 (WORK FILE)"]:::data
+  MAP["MAP CONSBENF-M01 (tela)"]:::data
+
+  CADBENEF -->|FIND/STORE/UPDATE| BEN
+  CADDEPEND -->|FIND/UPDATE| BEN
+  CADPROG -->|FIND/STORE| PRG
+  CONSBENF -->|FIND| BEN
+  CONSBENF -->|READ| PAG
+  CONSBENF -.->|INPUT USING MAP| MAP
+  VALELEG -->|FIND| BEN
+  VALELEG -->|FIND| PRG
+  CALCBENF -->|FIND| BEN
+  CALCBENF -->|FIND| PRG
+  CALCBENF -->|STORE| PAG
+  CALCDSCT -->|FIND/UPDATE| PAG
+  CALCDSCT -->|FIND| BEN
+  CALCCORR -->|READ/UPDATE| PAG
+  BATCHPGT -->|READ| BEN
+  BATCHPGT -->|FIND| PRG
+  BATCHPGT -->|READ/STORE| PAG
+  BATCHCON -->|READ WORK| EXT
+  BATCHCON -->|FIND/UPDATE| PAG
+  BATCHCON -->|READ/STORE| AUD
+  BATCHREL -->|READ| PAG
+  BATCHREL -->|FIND| BEN
+  RELPGT -->|READ| PAG
+  RELPGT -->|FIND| BEN
+  RELAUDIT -->|READ| AUD

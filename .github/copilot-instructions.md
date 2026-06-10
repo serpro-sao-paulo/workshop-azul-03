@@ -93,5 +93,8 @@ Toolchain fixa; misturar ferramentas quebra a rastreabilidade spec → code → 
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
+shell commands, and other important information, read the current plan:
+[`02-spec-moderna/plan.md`](../02-spec-moderna/plan.md) (feature: SIFAP Core
+Modernization — Java 21 + Spring Boot 3.3 Modular Monolith, PostgreSQL 16,
+Next.js 15; design artifacts: research.md, data-model.md, contracts/, quickstart.md).
 <!-- SPECKIT END -->

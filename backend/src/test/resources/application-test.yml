@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: jdbc:tc:postgresql:16:///sifap_test?TC_REUSABLE=true
+    username: test
+    password: test
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    schemas:
+      - beneficiaries
+      - programs
+      - payments
+      - audit
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://test-issuer

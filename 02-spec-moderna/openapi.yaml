@@ -1,0 +1,456 @@
+openapi: 3.0.3
+info:
+  title: SIFAP Moderno — API
+  version: 0.1.0
+  description: >
+    Esqueleto OpenAPI do Modular Monolith SIFAP (Estágio 2 — @architect-agent).
+    Define assinaturas por bounded context; schemas detalhados e implementação
+    são completados no Estágio 3 pelo @builder-agent.
+    Base package: com.datacorp.app. Fonte: modular-monolith-design.md.
+servers:
+  - url: /api/v1
+    description: Base path (versionado)
+
+tags:
+  - name: beneficiaries
+    description: Gestão de Beneficiários (cadastro, dependentes, elegibilidade) — owns BENEFICIARIO
+  - name: programs
+    description: Catálogo de Programas Sociais (reference data, Fator-K) — owns PROGRAMA-SOCIAL
+  - name: payments
+    description: Pagamentos & Folha (cálculo, conciliação, correção, relatórios) — owns PAGAMENTO
+  - name: audit
+    description: Auditoria & Conformidade (trilha imutável) — owns AUDITORIA
+
+paths:
+  # ---------------------------------------------------------------- beneficiaries
+  /beneficiarios:
+    post:
+      tags: [beneficiaries]
+      summary: Cadastra um beneficiário (CPF Módulo 11, status inicial 'A', suspensão >75)
+      description: "Requisitos: REQ-001, REQ-002, REQ-003, REQ-004, REQ-005, REQ-006, REQ-007, REQ-008"
+      operationId: cadastrarBeneficiario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BeneficiarioRequest'
+      responses:
+        '201':
+          description: Beneficiário criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BeneficiarioResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          description: CPF já cadastrado (REQ-005)
+
+  /beneficiarios/{cpf}:
+    parameters:
+      - $ref: '#/components/parameters/Cpf'
+    get:
+      tags: [beneficiaries]
+      summary: Consulta beneficiário com CPF mascarado e histórico de pagamentos
+      description: "Requisitos: REQ-015"
+      operationId: consultarBeneficiario
+      responses:
+        '200':
+          description: Dados do beneficiário (CPF mascarado)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BeneficiarioDetailResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [beneficiaries]
+      summary: Altera dados mutáveis do beneficiário (status validado A/S/C/I/D)
+      description: "Requisitos: REQ-007"
+      operationId: alterarBeneficiario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BeneficiarioUpdateRequest'
+      responses:
+        '200':
+          description: Beneficiário atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BeneficiarioResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /beneficiarios/{cpf}/dependentes:
+    parameters:
+      - $ref: '#/components/parameters/Cpf'
+    post:
+      tags: [beneficiaries]
+      summary: Inclui dependente (máx 5, parentesco FI/CO/IR/OU, titular não C/D)
+      description: "Requisitos: REQ-009, REQ-010, REQ-011"
+      operationId: incluirDependente
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DependenteRequest'
+      responses:
+        '201':
+          description: Dependente incluído
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DependenteResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          description: Limite de 5 dependentes atingido ou titular C/D (REQ-009, REQ-010)
+
+  /beneficiarios/{cpf}/elegibilidade:
+    parameters:
+      - $ref: '#/components/parameters/Cpf'
+    get:
+      tags: [beneficiaries]
+      summary: Avalia elegibilidade do beneficiário a um programa
+      description: "Requisitos: REQ-012, REQ-013, REQ-014"
+      operationId: avaliarElegibilidade
+      parameters:
+        - name: programa
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Código do programa social
+      responses:
+        '200':
+          description: Resultado da avaliação de elegibilidade
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ElegibilidadeResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ---------------------------------------------------------------- programs
+  /programas:
+    post:
+      tags: [programs]
+      summary: Cadastra programa social (valor base ajustado pelo Fator-K)
+      description: "Requisitos: REQ-016, REQ-017"
+      operationId: cadastrarPrograma
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProgramaRequest'
+      responses:
+        '201':
+          description: Programa criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgramaResponse'
+        '409':
+          description: Código de programa já cadastrado (REQ-016)
+    get:
+      tags: [programs]
+      summary: Lista programas sociais ativos
+      description: "Requisitos: REQ-014"
+      operationId: listarProgramas
+      responses:
+        '200':
+          description: Lista de programas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProgramaResponse'
+
+  /programas/{cod}:
+    get:
+      tags: [programs]
+      summary: Detalha um programa social
+      description: "Requisitos: REQ-017"
+      operationId: detalharPrograma
+      parameters:
+        - name: cod
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Programa
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgramaResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ---------------------------------------------------------------- payments
+  /folhas:
+    post:
+      tags: [payments]
+      summary: Gera a folha mensal por competência (idempotente, status 'G')
+      description: "Requisitos: REQ-018 a REQ-031"
+      operationId: gerarFolha
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GerarFolhaRequest'
+      responses:
+        '201':
+          description: Folha gerada (resumo com totalizadores)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FolhaResumoResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /pagamentos:
+    get:
+      tags: [payments]
+      summary: Consulta pagamentos por CPF e/ou competência
+      description: "Requisitos: REQ-015"
+      operationId: consultarPagamentos
+      parameters:
+        - name: cpf
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: competencia
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: '^[0-9]{6}$'
+          description: Competência AAAAMM
+      responses:
+        '200':
+          description: Lista de pagamentos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PagamentoResponse'
+
+  /conciliacoes:
+    post:
+      tags: [payments]
+      summary: Concilia o retorno bancário CNAB 240 (status P/D/E, divergências)
+      description: "Requisitos: REQ-032, REQ-033"
+      operationId: conciliarRetorno
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConciliacaoRequest'
+      responses:
+        '200':
+          description: Resumo da conciliação
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConciliacaoResumoResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /correcoes:
+    post:
+      tags: [payments]
+      summary: Aplica correção monetária a pagamentos (idempotente por IND-CORRIGIDO)
+      description: "Requisitos: REQ-034"
+      operationId: aplicarCorrecao
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CorrecaoRequest'
+      responses:
+        '200':
+          description: Correção aplicada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CorrecaoResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+
+  /relatorios/consolidado:
+    get:
+      tags: [payments]
+      summary: Relatório consolidado por macrorregião e status
+      description: "Requisitos: REQ-035"
+      operationId: relatorioConsolidado
+      parameters:
+        - name: competencia
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9]{6}$'
+      responses:
+        '200':
+          description: Relatório consolidado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelatorioConsolidadoResponse'
+
+  # ---------------------------------------------------------------- audit
+  /auditoria:
+    get:
+      tags: [audit]
+      summary: Consulta a trilha de auditoria (exclusões SEMPRE visíveis)
+      description: "Requisitos: REQ-036, REQ-037"
+      operationId: consultarAuditoria
+      parameters:
+        - name: de
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: ate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: acao
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [IN, AL, CO, CN, DV, EX]
+      responses:
+        '200':
+          description: Eventos de auditoria
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventoAuditoriaResponse'
+
+components:
+  parameters:
+    Cpf:
+      name: cpf
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[0-9]{11}$'
+      description: CPF sem formatação (11 dígitos)
+
+  responses:
+    NotFound:
+      description: Recurso não encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ValidationError:
+      description: Erro de validação (mensagens acumuladas)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    # Schemas são esqueletos — detalhes completados no Estágio 3.
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
+    BeneficiarioRequest:
+      type: object
+      description: REQ-001..REQ-008 (placeholder de schema)
+    BeneficiarioUpdateRequest:
+      type: object
+      description: REQ-007 (placeholder de schema)
+    BeneficiarioResponse:
+      type: object
+      description: placeholder de schema
+    BeneficiarioDetailResponse:
+      type: object
+      description: REQ-015 — inclui CPF mascarado e histórico (placeholder)
+    DependenteRequest:
+      type: object
+      description: REQ-009..REQ-011 (placeholder)
+    DependenteResponse:
+      type: object
+      description: placeholder de schema
+    ElegibilidadeResponse:
+      type: object
+      description: REQ-012..REQ-014 (placeholder)
+      properties:
+        elegivel:
+          type: boolean
+        motivos:
+          type: array
+          items:
+            type: string
+    ProgramaRequest:
+      type: object
+      description: REQ-016, REQ-017 (placeholder)
+    ProgramaResponse:
+      type: object
+      description: placeholder — descontosAplicaveis via ADR-001 (@ElementCollection/enum)
+    GerarFolhaRequest:
+      type: object
+      description: REQ-029 (placeholder)
+      properties:
+        competencia:
+          type: string
+          pattern: '^[0-9]{6}$'
+    FolhaResumoResponse:
+      type: object
+      description: REQ-029..REQ-031 — totalizadores e contadores (placeholder)
+    PagamentoResponse:
+      type: object
+      description: placeholder de schema
+    ConciliacaoRequest:
+      type: object
+      description: REQ-032 (placeholder)
+    ConciliacaoResumoResponse:
+      type: object
+      description: REQ-032, REQ-033 (placeholder)
+    CorrecaoRequest:
+      type: object
+      description: REQ-034 (placeholder)
+    CorrecaoResponse:
+      type: object
+      description: placeholder de schema
+    RelatorioConsolidadoResponse:
+      type: object
+      description: REQ-035 (placeholder)
+    EventoAuditoriaResponse:
+      type: object
+      description: REQ-036, REQ-037 (placeholder)
